@@ -4,16 +4,14 @@ import math
 import numpy as np
 from ultralytics import YOLO
 
-# Tu modelo pesado
 model = YOLO(r"C:\Users\jorge\Downloads\PROYECTODADOS\modelo_pesado.pt") 
 
 cap = cv2.VideoCapture(1)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-print("Iniciando cámara... Acomoda los dados.")
+print("Iniciando cámara")
 
-# CUENTA REGRESIVA
 for i in range(5, 0, -1):
     tiempo_inicio = time.time()
     while time.time() - tiempo_inicio < 1:
@@ -28,7 +26,7 @@ cap.release()
 cv2.destroyAllWindows()
 
 if ret:
-    print("¡Foto capturada! Ecualizando la luz de la charola...")
+    print("Foto guardada")
     
     resultados = model(frame_capturado, conf=0.4, imgsz=1024, augment=True)
     frame_pintado = resultados[0].plot(labels=False, conf=False) 
@@ -41,8 +39,7 @@ if ret:
             clase_id = int(caja.cls[0])
             numero = int(model.names[clase_id])
             x1, y1, x2, y2 = caja.xyxy[0].cpu().numpy()
-            
-            # LA MAGIA ANTI-BRILLOS (AHORA CON CLAHE ADAPTATIVO)
+ 
             if numero == 6 or numero == 9:
                 margen = 15
                 ex1, ey1 = max(0, int(x1) - margen), max(0, int(y1) - margen)
@@ -51,28 +48,24 @@ if ret:
                 recorte = frame_capturado[ey1:ey2, ex1:ex2]
                 gris = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
                 
-                # 1. Aplicamos CLAHE: Esto "apaga" los charolazos en el centro y mejora las orillas
                 clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
                 gris_clahe = clahe.apply(gris)
                 
-                # 2. Umbral de Otsu: En vez de usar el 190 fijo, la compu calcula el mejor blanco automáticamente
                 _, umbral = cv2.threshold(gris_clahe, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                 
                 contornos, _ = cv2.findContours(umbral, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 
                 if len(contornos) >= 2:
                     contornos = sorted(contornos, key=cv2.contourArea, reverse=True)
-                    c_num = contornos[0] # El número grande
+                    c_num = contornos[0] 
                     
                     punto_valido = None
-                    
-                    # Buscamos el punto real entre los demás contornos blancos
+
                     for c in contornos[1:]:
                         area = cv2.contourArea(c)
-                        if 5 < area < 150: # Filtramos que tenga el tamaño lógico de un punto
+                        if 5 < area < 150: 
                             perimetro = cv2.arcLength(c, True)
                             if perimetro > 0:
-                                # EL FILTRO DE GEOMETRÍA: Circularidad
                                 circularidad = 4 * math.pi * (area / (perimetro * perimetro))
                                 if circularidad > 0.4: 
                                     punto_valido = c
@@ -91,7 +84,6 @@ if ret:
                         diagonal_caja = math.hypot(ex2 - ex1, ey2 - ey1)
                         proporcion = distancia / diagonal_caja
                         
-                        # El balance perfecto para saber si está en la panza o lejos
                         if proporcion < 0.5: 
                             numero = 6
                         else:
@@ -105,9 +97,9 @@ if ret:
 
     cv2.putText(frame_pintado, f'Suma total: {suma_total}', (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
     
-    print("¡Listo! Presiona cualquier tecla en la imagen para cerrar.")
+    print("Presiona cualquier tecla en la imagen para cerrar")
     cv2.imshow('Resultado Final - Suma de Dados', frame_pintado)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 else:
-    print("Error: No se pudo capturar la foto.")
+    print("Error no se pudo capturar la foto.")
